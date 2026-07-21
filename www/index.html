@@ -216,7 +216,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
@@ -247,14 +247,32 @@ window.waveAuth = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc, get
 const signInBtn = document.getElementById('signInBtn');
 const authArea = document.getElementById('authArea');
 
-signInBtn.addEventListener('click', async () => {
-  const provider = new GoogleAuthProvider();
+// Detect if running inside Capacitor native app
+function isCapacitorNative() {
+  return window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+}
+
+// Unified Google Sign-In: native plugin for APK, popup for web
+async function doGoogleSignIn() {
   try {
+    if (isCapacitorNative()) {
+      // Native Capacitor Google Auth
+      if (Capacitor.Plugins && Capacitor.Plugins.GoogleAuth) {
+        const result = await Capacitor.Plugins.GoogleAuth.signIn();
+        const credential = GoogleAuthProvider.credential(result.authentication.idToken);
+        await signInWithCredential(auth, credential);
+        return;
+      }
+    }
+    // Web fallback (browser)
+    const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   } catch (e) {
     alert('Sign-in failed: ' + e.message);
   }
-});
+}
+
+signInBtn.addEventListener('click', doGoogleSignIn);
 
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
@@ -269,7 +287,7 @@ onAuthStateChanged(auth, (user) => {
     loadPlaylists();
   } else {
     authArea.innerHTML = `<button class="btn-ghost" id="signInBtn2"><svg class="icon-svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.27-3.13.77-4.59l-7.98-6.19A23.94 23.94 0 0 0 0 24c0 3.87.92 7.53 2.56 10.78z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>`;
-    document.getElementById('signInBtn2').addEventListener('click', () => signInBtn.click());
+    document.getElementById('signInBtn2').addEventListener('click', doGoogleSignIn);
     document.dispatchEvent(new CustomEvent('wave-auth-ready', { detail: null }));
     document.getElementById('playlistsList').innerHTML = '<div class="status">Sign in to sync playlists across devices.</div>';
   }
@@ -357,9 +375,6 @@ if ('serviceWorker' in navigator) {
 }
 
 // ---------- Resume playback the moment the tab/screen becomes active again ----------
-// This can't force audio to keep running while the screen is fully locked
-// (that's an OS/browser restriction on web pages), but it makes sure playback
-// picks back up immediately instead of staying silently paused.
 let wasPlayingBeforeHidden = false;
 document.addEventListener('visibilitychange', () => {
   if (!isPlayerReady || currentIndex === -1) return;
@@ -386,12 +401,16 @@ window.onYouTubeIframeAPIReady = function() {
 
 function onPlayerStateChange(e) {
   const playBtn = document.getElementById('playBtn');
+  const track = currentIndex >= 0 ? queue[currentIndex] : null;
+
   if (e.data === YT.PlayerState.PLAYING) {
     playBtn.innerHTML = ICONS.pause; startProgressLoop();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+    if (window.syncNativeControls) window.syncNativeControls(track, true);
   } else if (e.data === YT.PlayerState.PAUSED) {
     playBtn.innerHTML = ICONS.play;
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+    if (window.syncNativeControls) window.syncNativeControls(track, false);
   } else if (e.data === YT.PlayerState.ENDED) {
     playNext();
   }
@@ -618,6 +637,11 @@ function playTrack(index) {
   document.getElementById('npChannel').textContent = track.channel;
   document.getElementById('player').classList.add('active');
 
+  // Keep app alive in background when music is playing
+  if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode) {
+    cordova.plugins.backgroundMode.enable();
+  }
+
   resetLyrics();
   renderResults();
   updateMediaSession(track);
@@ -641,6 +665,9 @@ function updateMediaSession(track) {
   navigator.mediaSession.setActionHandler('seekto', (details) => {
     if (isPlayerReady && details.seekTime != null) player.seekTo(details.seekTime, true);
   });
+
+  // Sync native lock-screen controls (Capacitor APK)
+  if (window.syncNativeControls) window.syncNativeControls(track, true);
 }
 
 document.getElementById('playBtn').addEventListener('click', () => {
@@ -916,34 +943,35 @@ document.addEventListener('deviceready', function () {
   // Real lock-screen / notification-shade controls with track info,
   // artwork, and working play/pause/next/prev buttons.
   if (window.MusicControls) {
-    function syncLockScreenControls(track, isPlaying) {
-      MusicControls.create({
-        track: track ? track.title : 'Nothing playing',
-        artist: track ? track.channel : 'Wave',
-        cover: track ? track.thumb : '',
-        isPlaying: !!isPlaying,
-        dismissable: false,
-        hasPrev: true,
-        hasNext: true,
-        hasClose: false
-      });
-      MusicControls.subscribe(function (action) {
-        const parsed = JSON.parse(action).message;
-        if (parsed === 'music-controls-next') playNext();
-        else if (parsed === 'music-controls-previous') playPrev();
-        else if (parsed === 'music-controls-pause') { if (isPlayerReady) player.pauseVideo(); }
-        else if (parsed === 'music-controls-play') { if (isPlayerReady) player.playVideo(); }
-      });
-      MusicControls.listen();
-    }
+    window.syncNativeControls = function (track, isPlaying) {
+      try {
+        MusicControls.create({
+          track: track ? track.title : 'Nothing playing',
+          artist: track ? track.channel : 'Wave',
+          cover: track ? track.thumb : '',
+          isPlaying: !!isPlaying,
+          dismissable: false,
+          hasPrev: true,
+          hasNext: true,
+          hasClose: false
+        }, function () {}, function () {});
 
-    // Hook into the existing updateMediaSession() calls: whenever the web
-    // app updates the browser's Media Session, mirror the same info to
-    // the native lock-screen controls plugin.
-    const originalUpdateMediaSession = window.updateMediaSession;
-    window.updateMediaSession = function (track) {
-      if (typeof originalUpdateMediaSession === 'function') originalUpdateMediaSession(track);
-      syncLockScreenControls(track, true);
+        MusicControls.subscribe(function (action) {
+          try {
+            const parsed = JSON.parse(action);
+            const msg = parsed.message;
+            if (msg === 'music-controls-next') playNext();
+            else if (msg === 'music-controls-previous') playPrev();
+            else if (msg === 'music-controls-pause') { if (isPlayerReady) player.pauseVideo(); }
+            else if (msg === 'music-controls-play') { if (isPlayerReady) player.playVideo(); }
+          } catch (err) {
+            console.error('MusicControls action error:', err);
+          }
+        });
+        MusicControls.listen();
+      } catch (err) {
+        console.error('MusicControls error:', err);
+      }
     };
   }
 }, false);
