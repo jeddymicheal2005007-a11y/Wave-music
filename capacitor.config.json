@@ -1,0 +1,9 @@
+{
+  "appId": "com.kedx.wave",
+  "appName": "Wave",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}
