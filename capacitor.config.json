@@ -5,5 +5,12 @@
   "bundledWebRuntime": false,
   "android": {
     "allowMixedContent": true
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "685590551223-goth0t76p9fk5gdtf3lb7nghimcren8i.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   }
 }
