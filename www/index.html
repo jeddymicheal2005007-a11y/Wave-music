@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wave">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>Wave — Personal Music Player</title>
+<style>
+  :root{
+    --bg: #0a0a0f;
+    --glass: rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.12);
+    --accent: #ff3b7f;
+    --accent2: #7b5cff;
+    --text: #f2f2f5;
+    --text-dim: #9a9aa8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{ height:100%; background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; overflow-x:hidden; }
+  body{ min-height:100dvh; display:flex; flex-direction:column; position:relative; }
+
+  .bg-orb{ position:fixed; border-radius:50%; filter: blur(90px); opacity:0.35; z-index:0; animation: float 18s ease-in-out infinite; }
+  .orb1{ width:340px; height:340px; background: var(--accent); top:-100px; left:-80px; }
+  .orb2{ width:300px; height:300px; background: var(--accent2); bottom:-100px; right:-60px; animation-delay:4s;}
+  .orb3{ width:220px; height:220px; background:#22d3ee; top:40%; left:60%; animation-delay:8s; opacity:0.2;}
+  @keyframes float{ 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(30px,-40px) scale(1.15);} }
+
+  header{ position:relative; z-index:2; padding: 18px 16px 10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .brand h1{ font-size:20px; font-weight:700; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .brand p{ font-size:11px; color:var(--text-dim); }
+
+  .auth-area{ display:flex; align-items:center; gap:8px; }
+  .auth-area img{ width:30px; height:30px; border-radius:50%; }
+  .btn-ghost{ background: var(--glass); border:1px solid var(--glass-border); color:var(--text);
+    border-radius:10px; font-size:12px; padding:7px 12px; cursor:pointer; }
+
+  .tabs{ display:flex; gap:8px; padding: 0 16px 10px; position:relative; z-index:2; }
+  .tab-btn{ background: var(--glass); border:1px solid var(--glass-border); color:var(--text-dim);
+    border-radius:10px; font-size:12px; padding:7px 14px; cursor:pointer; }
+  .tab-btn.active{ color:white; background: linear-gradient(135deg, var(--accent), var(--accent2)); border:none; }
+
+  .search-wrap{ position:relative; z-index:2; padding: 0 16px 12px; }
+  .search-bar{ display:flex; gap:8px; background: var(--glass); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px); border-radius: 16px; padding: 10px 14px; }
+  .search-bar input{ flex:1; background:transparent; border:none; outline:none; color:var(--text); font-size:15px; }
+  .search-bar input::placeholder{ color:var(--text-dim); }
+  .search-bar button{ background: linear-gradient(135deg, var(--accent), var(--accent2)); border:none;
+    border-radius:10px; color:white; font-weight:600; font-size:13px; padding:8px 14px; cursor:pointer; }
+
+  main{ flex:1; position:relative; z-index:2; overflow-y:auto; padding: 4px 16px 200px; }
+  .status{ text-align:center; color:var(--text-dim); font-size:13px; padding:24px 0; }
+
+  .track{ display:flex; align-items:center; gap:12px; background: var(--glass); border:1px solid var(--glass-border);
+    border-radius:14px; padding:10px; margin-bottom:10px; cursor:pointer; transition: background 0.2s, transform 0.15s; }
+  .track:active{ transform: scale(0.98); }
+  .track:hover{ background: rgba(255,255,255,0.1); }
+  .track img{ width:52px; height:52px; border-radius:10px; object-fit:cover; flex-shrink:0; }
+  .track .meta{ flex:1; min-width:0; }
+  .track .meta .t{ font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .track .meta .c{ font-size:12px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .track .playing-badge{ font-size:11px; color: var(--accent); flex-shrink:0; }
+  .track .add-btn{ background:none; border:1px solid var(--glass-border); color:var(--text);
+    border-radius:8px; width:32px; height:32px; flex-shrink:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; }
+
+  .playlist-card{ background: var(--glass); border:1px solid var(--glass-border); border-radius:14px;
+    padding:14px; margin-bottom:10px; }
+  .playlist-card .row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .playlist-card .name{ font-size:15px; font-weight:700; }
+  .playlist-card .count{ font-size:12px; color:var(--text-dim); }
+  .playlist-card .actions{ display:flex; gap:8px; margin-top:8px; }
+  .playlist-card .actions button{ background: rgba(255,255,255,0.08); border:none; color:var(--text);
+    border-radius:8px; font-size:12px; padding:6px 12px; cursor:pointer; }
+
+  .new-playlist-row{ display:flex; gap:8px; margin-bottom:14px; }
+  .new-playlist-row input{ flex:1; background: var(--glass); border:1px solid var(--glass-border);
+    border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; outline:none; }
+  .new-playlist-row button{ background: linear-gradient(135deg, var(--accent), var(--accent2)); border:none;
+    border-radius:10px; color:white; font-weight:600; font-size:13px; padding:8px 16px; cursor:pointer; }
+
+  .player{ position:fixed; bottom:0; left:0; right:0; z-index:10; background: rgba(15,15,24,0.9);
+    backdrop-filter: blur(24px); border-top:1px solid var(--glass-border);
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform 0.35s ease; }
+  .player.active{ transform: translateY(0); }
+
+  .now-playing{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .now-playing img{ width:44px; height:44px; border-radius:9px; object-fit:cover; }
+  .now-playing .info{ flex:1; min-width:0; }
+  .now-playing .info .t{ font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .now-playing .info .c{ font-size:11px; color:var(--text-dim); }
+  .icon-btn{ background: var(--glass); border:1px solid var(--glass-border); color:var(--text);
+    border-radius:10px; font-size:11px; padding:6px 10px; cursor:pointer; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center; }
+  .icon-btn.on{ background: linear-gradient(135deg, var(--accent), var(--accent2)); border:none; }
+
+  .progress-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .progress-row span{ font-size:10px; color:var(--text-dim); width:32px; flex-shrink:0;}
+  #seek{ flex:1; -webkit-appearance:none; appearance:none; height:4px; border-radius:2px;
+    background: rgba(255,255,255,0.15); outline:none; }
+  #seek::-webkit-slider-thumb{ -webkit-appearance:none; width:12px; height:12px; border-radius:50%;
+    background: var(--accent); cursor:pointer; }
+
+  .controls{ display:flex; align-items:center; justify-content:center; gap:20px; }
+  .controls button{ background:none; border:none; color:var(--text); font-size:20px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; }
+  .controls .play-btn{ width:48px; height:48px; border-radius:50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); font-size:20px; }
+
+  #ytplayer-wrap{ width:100%; max-width:480px; margin: 0 auto 10px; border-radius:12px; overflow:hidden;
+    display:none; aspect-ratio: 16/9; }
+  #ytplayer-wrap.show{ display:block; }
+  #ytplayer{ width:100%; height:100%; }
+
+  /* karaoke lyrics */
+  .lyrics-panel{ display:none; max-height:220px; overflow-y:auto; background: rgba(255,255,255,0.04);
+    border-radius:10px; padding:14px 12px; margin-bottom:10px; font-size:15px; line-height:2.1;
+    text-align:center; scroll-behavior:smooth; }
+  .lyrics-panel.show{ display:block; }
+  .lyric-line{ color: var(--text-dim); transition: color 0.3s, transform 0.3s, opacity 0.3s; opacity:0.5; transform: scale(0.96); }
+  .lyric-line.active{ color: var(--text); font-weight:700; opacity:1; transform: scale(1.04); }
+  .lyric-word{ display:inline-block; transition: color 0.15s, transform 0.15s; }
+  .lyric-word.sung{ color: var(--accent); transform: translateY(-1px); }
+
+  ::-webkit-scrollbar{ width:0px; }
+  .hidden{ display:none !important; }
+  .icon-svg{ width:20px; height:20px; display:inline-block; vertical-align:middle; }
+  .icon-svg.small{ width:16px; height:16px; }
+  .btn-ghost .icon-svg{ width:16px; height:16px; margin-right:5px; margin-bottom:-3px; }
+  .lyrics-label{ display:inline-flex; align-items:center; gap:5px; }
+</style>
+</head>
+<body>
+
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+<div class="bg-orb orb3"></div>
+
+<header>
+  <div class="brand">
+    <h1>Wave</h1>
+    <p>your music, your rules</p>
+  </div>
+  <div class="auth-area" id="authArea">
+    <button class="btn-ghost" id="signInBtn"><svg class="icon-svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.27-3.13.77-4.59l-7.98-6.19A23.94 23.94 0 0 0 0 24c0 3.87.92 7.53 2.56 10.78z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" id="tabSearch">Search</button>
+  <button class="tab-btn" id="tabPlaylists">My Playlists</button>
+</div>
+
+<div class="search-wrap" id="searchWrap">
+  <div class="search-bar">
+    <input id="searchInput" type="text" placeholder="Search any song or artist..." />
+    <button id="searchBtn">Search</button>
+  </div>
+</div>
+
+<main id="mainSearch">
+  <div class="status"><span class="lyrics-label"><svg class="icon-svg small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Search for a song to get started</span></div>
+</main>
+
+<main id="mainPlaylists" class="hidden">
+  <div class="new-playlist-row">
+    <input id="newPlaylistName" type="text" placeholder="New playlist name..." />
+    <button id="createPlaylistBtn">Create</button>
+  </div>
+  <div id="playlistsList"><div class="status">Sign in to sync playlists across devices.</div></div>
+  <div id="playlistDetail" class="hidden"></div>
+</main>
+
+<div class="player" id="player">
+  <div id="ytplayer-wrap"><div id="ytplayer"></div></div>
+
+  <div class="lyrics-panel" id="lyricsPanel"></div>
+
+  <div class="now-playing">
+    <img id="npImg" src="" alt="">
+    <div class="info">
+      <div class="t" id="npTitle">Nothing playing</div>
+      <div class="c" id="npChannel"></div>
+    </div>
+    <button class="icon-btn" id="addToPlaylistBtn" title="Add to playlist"><svg class="icon-svg small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    <button class="icon-btn" id="lyricsBtn"><span class="lyrics-label"><svg class="icon-svg small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Lyrics</span></button>
+  </div>
+
+  <div class="progress-row">
+    <span id="curTime">0:00</span>
+    <input type="range" id="seek" min="0" max="100" value="0">
+    <span id="durTime">0:00</span>
+  </div>
+
+  <div class="controls">
+    <button class="icon-btn" id="videoToggle" title="Toggle video" style="border-radius:50%;width:36px;height:36px;padding:0">
+      <svg class="icon-svg small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    </button>
+    <button id="prevBtn"><svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6L10 12l10 6z"/></svg></button>
+    <button class="play-btn" id="playBtn"><svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+    <button id="nextBtn"><svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg></button>
+    <button id="shuffleBtn" title="Shuffle"><svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
+    <button id="radioBtn" title="Radio mode — auto-plays new music"><svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/></svg></button>
+  </div>
+</div>
+
+<!-- Firebase (module) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
+  query, where, arrayUnion, arrayRemove, serverTimestamp, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Separate Firebase app instance/name so this never collides with any other
+// Firebase app initialized on the same page.
+const firebaseConfig = {
+  apiKey: "AIzaSyBUEKYA5x1T2Qb3T8Z6rP5qv5jmfTXlRU0",
+  authDomain: "pink-app-5ecd1.firebaseapp.com",
+  projectId: "pink-app-5ecd1",
+  storageBucket: "pink-app-5ecd1.firebasestorage.app",
+  messagingSenderId: "659145722582",
+  appId: "1:659145722582:web:1e0778ce8aa62dff129777"
+};
+
+const app = initializeApp(firebaseConfig, "waveApp");
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser = null;
+let unsubPlaylists = null;
+
+window.waveAuth = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
+  query, where, arrayUnion, arrayRemove, serverTimestamp, onSnapshot };
+
+const signInBtn = document.getElementById('signInBtn');
+const authArea = document.getElementById('authArea');
+
+signInBtn.addEventListener('click', async () => {
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    alert('Sign-in failed: ' + e.message);
+  }
+});
+
+onAuthStateChanged(auth, (user) => {
+  currentUser = user;
+  window.waveCurrentUser = user;
+  if (user) {
+    authArea.innerHTML = `
+      <img src="${user.photoURL || ''}" alt="">
+      <button class="btn-ghost" id="signOutBtn">Sign out</button>
+    `;
+    document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
+    document.dispatchEvent(new CustomEvent('wave-auth-ready', { detail: user }));
+    loadPlaylists();
+  } else {
+    authArea.innerHTML = `<button class="btn-ghost" id="signInBtn2"><svg class="icon-svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.27-3.13.77-4.59l-7.98-6.19A23.94 23.94 0 0 0 0 24c0 3.87.92 7.53 2.56 10.78z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>`;
+    document.getElementById('signInBtn2').addEventListener('click', () => signInBtn.click());
+    document.dispatchEvent(new CustomEvent('wave-auth-ready', { detail: null }));
+    document.getElementById('playlistsList').innerHTML = '<div class="status">Sign in to sync playlists across devices.</div>';
+  }
+});
+
+// ---- Playlist functions exposed globally for the non-module script below ----
+window.createPlaylist = async function(name) {
+  if (!currentUser) { alert('Sign in first.'); return; }
+  await addDoc(collection(db, 'musicPlaylists'), {
+    userId: currentUser.uid,
+    name: name,
+    tracks: [],
+    createdAt: serverTimestamp()
+  });
+};
+
+window.deletePlaylistDoc = async function(playlistId) {
+  await deleteDoc(doc(db, 'musicPlaylists', playlistId));
+};
+
+window.addTrackToPlaylist = async function(playlistId, track) {
+  await updateDoc(doc(db, 'musicPlaylists', playlistId), {
+    tracks: arrayUnion(track)
+  });
+};
+
+window.removeTrackFromPlaylist = async function(playlistId, track) {
+  await updateDoc(doc(db, 'musicPlaylists', playlistId), {
+    tracks: arrayRemove(track)
+  });
+};
+
+function loadPlaylists() {
+  if (unsubPlaylists) unsubPlaylists();
+  if (!currentUser) return;
+  const q = query(collection(db, 'musicPlaylists'), where('userId', '==', currentUser.uid));
+  unsubPlaylists = onSnapshot(q, (snap) => {
+    const playlists = [];
+    snap.forEach(d => playlists.push({ id: d.id, ...d.data() }));
+    document.dispatchEvent(new CustomEvent('wave-playlists-updated', { detail: playlists }));
+  }, (err) => {
+    console.error('Playlist load error:', err);
+    document.getElementById('playlistsList').innerHTML =
+      '<div class="status">Could not load playlists: ' + err.message + '</div>';
+  });
+}
+</script>
+
+<!-- App logic (non-module) -->
+<script>
+const YT_API_KEY = "AIzaSyCcgX2h3eUL9JexyM8_JuKwVu-ZmHcy3GY";
+
+const ICONS = {
+  play: '<svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  pause: '<svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  plus: '<svg class="icon-svg small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  close: '<svg class="icon-svg small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  playingBadge: '<svg class="icon-svg small" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'
+};
+
+let queue = [];
+let currentIndex = -1;
+let player;
+let isPlayerReady = false;
+let progressTimer = null;
+let videoVisible = false;
+let shuffleOn = false;
+let myPlaylists = [];
+let signedIn = false;
+let activePlaylistView = null; // playlist id currently expanded
+let radioMode = false;
+let isFetchingRadio = false;
+
+const RADIO_SEED_TERMS = [
+  "afrobeats hits", "trending music", "top hits 2026", "chill music mix",
+  "hip hop hits", "pop hits", "amapiano mix", "rnb hits", "viral songs",
+  "dance music hits", "naija hits", "gospel hits", "reggae hits", "love songs"
+];
+
+// ---------- PWA install support ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW registration failed:', err));
+  });
+}
+
+// ---------- Resume playback the moment the tab/screen becomes active again ----------
+// This can't force audio to keep running while the screen is fully locked
+// (that's an OS/browser restriction on web pages), but it makes sure playback
+// picks back up immediately instead of staying silently paused.
+let wasPlayingBeforeHidden = false;
+document.addEventListener('visibilitychange', () => {
+  if (!isPlayerReady || currentIndex === -1) return;
+  if (document.visibilityState === 'hidden') {
+    wasPlayingBeforeHidden = (player.getPlayerState() === YT.PlayerState.PLAYING);
+  } else if (document.visibilityState === 'visible') {
+    if (wasPlayingBeforeHidden && player.getPlayerState() !== YT.PlayerState.PLAYING) {
+      player.playVideo();
+    }
+  }
+});
+
+const tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(tag);
+
+window.onYouTubeIframeAPIReady = function() {
+  player = new YT.Player('ytplayer', {
+    height: '100%', width: '100%',
+    playerVars: { playsinline: 1, rel: 0, controls: 0 },
+    events: { onReady: () => { isPlayerReady = true; }, onStateChange: onPlayerStateChange }
+  });
+};
+
+function onPlayerStateChange(e) {
+  const playBtn = document.getElementById('playBtn');
+  if (e.data === YT.PlayerState.PLAYING) {
+    playBtn.innerHTML = ICONS.pause; startProgressLoop();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  } else if (e.data === YT.PlayerState.PAUSED) {
+    playBtn.innerHTML = ICONS.play;
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  } else if (e.data === YT.PlayerState.ENDED) {
+    playNext();
+  }
+}
+
+// ---------- Tabs ----------
+const tabSearch = document.getElementById('tabSearch');
+const tabPlaylists = document.getElementById('tabPlaylists');
+const searchWrap = document.getElementById('searchWrap');
+const mainSearch = document.getElementById('mainSearch');
+const mainPlaylists = document.getElementById('mainPlaylists');
+
+tabSearch.addEventListener('click', () => {
+  tabSearch.classList.add('active'); tabPlaylists.classList.remove('active');
+  searchWrap.classList.remove('hidden'); mainSearch.classList.remove('hidden');
+  mainPlaylists.classList.add('hidden');
+});
+tabPlaylists.addEventListener('click', () => {
+  tabPlaylists.classList.add('active'); tabSearch.classList.remove('active');
+  searchWrap.classList.add('hidden'); mainSearch.classList.add('hidden');
+  mainPlaylists.classList.remove('hidden');
+});
+
+// ---------- Auth events ----------
+document.addEventListener('wave-auth-ready', (e) => {
+  signedIn = !!e.detail;
+});
+
+document.addEventListener('wave-playlists-updated', (e) => {
+  myPlaylists = e.detail;
+  renderPlaylists();
+  if (activePlaylistView) {
+    const updated = myPlaylists.find(p => p.id === activePlaylistView);
+    if (updated) renderPlaylistDetail(updated);
+  }
+});
+
+document.getElementById('createPlaylistBtn').addEventListener('click', async () => {
+  const nameInput = document.getElementById('newPlaylistName');
+  const name = nameInput.value.trim();
+  if (!name) return;
+  if (!signedIn) { alert('Sign in with Google first to create playlists.'); return; }
+  await window.createPlaylist(name);
+  nameInput.value = '';
+});
+
+function renderPlaylists() {
+  const container = document.getElementById('playlistsList');
+  if (!signedIn) {
+    container.innerHTML = '<div class="status">Sign in to sync playlists across devices.</div>';
+    return;
+  }
+  if (myPlaylists.length === 0) {
+    container.innerHTML = '<div class="status">No playlists yet. Create one above.</div>';
+    return;
+  }
+  container.innerHTML = myPlaylists.map(p => `
+    <div class="playlist-card">
+      <div class="row">
+        <div class="name">${escapeHtml(p.name)}</div>
+        <div class="count">${(p.tracks || []).length} songs</div>
+      </div>
+      <div class="actions">
+        <button onclick="viewPlaylist('${p.id}')">Open</button>
+        <button onclick="playPlaylist('${p.id}')">Play All</button>
+        <button onclick="confirmDeletePlaylist('${p.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.confirmDeletePlaylist = async function(id) {
+  if (!confirm('Delete this playlist?')) return;
+  await window.deletePlaylistDoc(id);
+  if (activePlaylistView === id) {
+    activePlaylistView = null;
+    document.getElementById('playlistDetail').classList.add('hidden');
+  }
+};
+
+window.viewPlaylist = function(id) {
+  activePlaylistView = id;
+  const p = myPlaylists.find(pl => pl.id === id);
+  if (p) renderPlaylistDetail(p);
+};
+
+function renderPlaylistDetail(p) {
+  const detail = document.getElementById('playlistDetail');
+  detail.classList.remove('hidden');
+  const tracks = p.tracks || [];
+  detail.innerHTML = `
+    <h3 style="margin-bottom:10px">${escapeHtml(p.name)}</h3>
+    ${tracks.length === 0 ? '<div class="status">No songs yet. Add some from Search.</div>' :
+      tracks.map((t, i) => `
+        <div class="track" onclick="playFromPlaylist('${p.id}', ${i})">
+          <img src="${t.thumb}" alt="">
+          <div class="meta">
+            <div class="t">${escapeHtml(t.title)}</div>
+            <div class="c">${escapeHtml(t.channel)}</div>
+          </div>
+          <button class="add-btn" onclick="event.stopPropagation(); removeFromPlaylistUI('${p.id}', ${i})">${ICONS.close}</button>
+        </div>
+      `).join('')
+    }
+  `;
+}
+
+window.removeFromPlaylistUI = async function(playlistId, index) {
+  const p = myPlaylists.find(pl => pl.id === playlistId);
+  if (!p) return;
+  const track = p.tracks[index];
+  await window.removeTrackFromPlaylist(playlistId, track);
+};
+
+window.playPlaylist = function(id) {
+  const p = myPlaylists.find(pl => pl.id === id);
+  if (!p || !p.tracks || p.tracks.length === 0) return;
+  queue = p.tracks.map(t => ({ id: t.videoId, title: t.title, channel: t.channel, thumb: t.thumb }));
+  playTrack(0);
+};
+
+window.playFromPlaylist = function(playlistId, index) {
+  const p = myPlaylists.find(pl => pl.id === playlistId);
+  if (!p) return;
+  queue = p.tracks.map(t => ({ id: t.videoId, title: t.title, channel: t.channel, thumb: t.thumb }));
+  playTrack(index);
+};
+
+// ---------- Search ----------
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
+const resultsEl = document.getElementById('mainSearch');
+
+searchBtn.addEventListener('click', doSearch);
+searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+async function doSearch() {
+  const q = searchInput.value.trim();
+  if (!q) return;
+  resultsEl.innerHTML = '<div class="status">Searching...</div>';
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&type=video&videoCategoryId=10&q=${encodeURIComponent(q)}&key=${YT_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) { resultsEl.innerHTML = `<div class="status">Error: ${data.error.message}</div>`; return; }
+    if (!data.items || data.items.length === 0) { resultsEl.innerHTML = '<div class="status">No results found.</div>'; return; }
+
+    queue = data.items.map(item => ({
+      id: item.id.videoId,
+      title: decodeHtml(item.snippet.title),
+      channel: item.snippet.channelTitle,
+      thumb: item.snippet.thumbnails.medium.url
+    }));
+    renderResults();
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="status">Something went wrong. Check your API key / connection.</div>`;
+    console.error(err);
+  }
+}
+
+function decodeHtml(html) {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = html;
+  return txt.value;
+}
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function renderResults() {
+  resultsEl.innerHTML = '';
+  queue.forEach((track, i) => {
+    const div = document.createElement('div');
+    div.className = 'track';
+    div.innerHTML = `
+      <img src="${track.thumb}" alt="">
+      <div class="meta">
+        <div class="t">${escapeHtml(track.title)}</div>
+        <div class="c">${escapeHtml(track.channel)}</div>
+      </div>
+      ${i === currentIndex ? `<div class="playing-badge">${ICONS.playingBadge}</div>` : `<button class="add-btn" title="Add to playlist">${ICONS.plus}</button>`}
+    `;
+    div.addEventListener('click', (ev) => {
+      if (ev.target.classList.contains('add-btn')) {
+        ev.stopPropagation();
+        openAddToPlaylistMenu(track);
+        return;
+      }
+      playTrack(i);
+    });
+    resultsEl.appendChild(div);
+  });
+}
+
+function openAddToPlaylistMenu(track) {
+  if (!signedIn) { alert('Sign in with Google to save playlists.'); return; }
+  if (myPlaylists.length === 0) { alert('Create a playlist first (My Playlists tab).'); return; }
+  const names = myPlaylists.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+  const choice = prompt(`Add "${track.title}" to which playlist?\n\n${names}\n\nEnter the number:`);
+  const idx = parseInt(choice) - 1;
+  if (isNaN(idx) || !myPlaylists[idx]) return;
+  window.addTrackToPlaylist(myPlaylists[idx].id, {
+    videoId: track.id, title: track.title, channel: track.channel, thumb: track.thumb
+  });
+}
+
+// Add-to-playlist button in the player bar (for currently playing track)
+document.getElementById('addToPlaylistBtn').addEventListener('click', () => {
+  if (currentIndex === -1) return;
+  openAddToPlaylistMenu(queue[currentIndex]);
+});
+
+// ---------- Playback ----------
+function playTrack(index) {
+  if (!isPlayerReady) { alert('Player still loading, try again in a sec.'); return; }
+  currentIndex = index;
+  const track = queue[index];
+
+  player.loadVideoById(track.id);
+  document.getElementById('npImg').src = track.thumb;
+  document.getElementById('npTitle').textContent = track.title;
+  document.getElementById('npChannel').textContent = track.channel;
+  document.getElementById('player').classList.add('active');
+
+  resetLyrics();
+  renderResults();
+  updateMediaSession(track);
+}
+
+// ---------- Media Session (lock-screen controls / background metadata) ----------
+function updateMediaSession(track) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: track.title,
+    artist: track.channel,
+    album: 'Wave',
+    artwork: [
+      { src: track.thumb, sizes: '320x180', type: 'image/jpeg' }
+    ]
+  });
+  navigator.mediaSession.setActionHandler('play', () => { if (isPlayerReady) player.playVideo(); });
+  navigator.mediaSession.setActionHandler('pause', () => { if (isPlayerReady) player.pauseVideo(); });
+  navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
+  navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
+  navigator.mediaSession.setActionHandler('seekto', (details) => {
+    if (isPlayerReady && details.seekTime != null) player.seekTo(details.seekTime, true);
+  });
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!isPlayerReady || currentIndex === -1) return;
+  const state = player.getPlayerState();
+  if (state === YT.PlayerState.PLAYING) player.pauseVideo();
+  else player.playVideo();
+});
+
+document.getElementById('nextBtn').addEventListener('click', playNext);
+document.getElementById('prevBtn').addEventListener('click', playPrev);
+document.getElementById('shuffleBtn').addEventListener('click', () => {
+  shuffleOn = !shuffleOn;
+  document.getElementById('shuffleBtn').style.color = shuffleOn ? 'var(--accent)' : 'var(--text)';
+});
+
+const radioBtn = document.getElementById('radioBtn');
+radioBtn.addEventListener('click', () => {
+  radioMode = !radioMode;
+  radioBtn.classList.toggle('on', radioMode);
+  radioBtn.style.color = radioMode ? 'var(--accent)' : 'var(--text)';
+  if (radioMode && queue.length - (currentIndex + 1) < 3) {
+    fetchRadioTracks();
+  }
+});
+
+async function playNext() {
+  // In radio mode, top up the queue before we run out
+  if (radioMode && queue.length - (currentIndex + 1) < 3 && !isFetchingRadio) {
+    await fetchRadioTracks();
+  }
+  if (queue.length === 0) return;
+
+  if (currentIndex + 1 >= queue.length && !radioMode) {
+    // reached the end and not in radio mode: wrap around (normal behavior)
+    playTrack(shuffleOn ? Math.floor(Math.random() * queue.length) : 0);
+    return;
+  }
+
+  const next = shuffleOn ? Math.floor(Math.random() * queue.length) : (currentIndex + 1) % queue.length;
+  playTrack(next);
+}
+
+async function fetchRadioTracks() {
+  if (isFetchingRadio) return;
+  isFetchingRadio = true;
+  try {
+    const seed = RADIO_SEED_TERMS[Math.floor(Math.random() * RADIO_SEED_TERMS.length)];
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoCategoryId=10&q=${encodeURIComponent(seed)}&key=${YT_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.items && data.items.length > 0) {
+      const existingIds = new Set(queue.map(t => t.id));
+      const fresh = data.items
+        .map(item => ({
+          id: item.id.videoId,
+          title: decodeHtml(item.snippet.title),
+          channel: item.snippet.channelTitle,
+          thumb: item.snippet.thumbnails.medium.url
+        }))
+        .filter(t => !existingIds.has(t.id));
+      queue = queue.concat(fresh);
+      if (!tabPlaylists.classList.contains('active')) renderResults();
+    }
+  } catch (err) {
+    console.error('Radio fetch failed:', err);
+  } finally {
+    isFetchingRadio = false;
+  }
+}
+function playPrev() {
+  if (queue.length === 0) return;
+  playTrack((currentIndex - 1 + queue.length) % queue.length);
+}
+
+// ---------- Video toggle ----------
+const videoToggle = document.getElementById('videoToggle');
+const wrap = document.getElementById('ytplayer-wrap');
+videoToggle.addEventListener('click', () => {
+  videoVisible = !videoVisible;
+  wrap.classList.toggle('show', videoVisible);
+  videoToggle.classList.toggle('on', videoVisible);
+});
+
+// ---------- Progress bar ----------
+const seek = document.getElementById('seek');
+const curTime = document.getElementById('curTime');
+const durTime = document.getElementById('durTime');
+let seeking = false;
+
+seek.addEventListener('input', () => { seeking = true; });
+seek.addEventListener('change', () => {
+  if (isPlayerReady && player.getDuration) {
+    const dur = player.getDuration();
+    player.seekTo((seek.value / 100) * dur, true);
+  }
+  seeking = false;
+});
+
+function startProgressLoop() {
+  clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    if (!isPlayerReady || !player.getDuration) return;
+    const dur = player.getDuration();
+    const cur = player.getCurrentTime();
+    if (dur > 0 && !seeking) seek.value = (cur / dur) * 100;
+    curTime.textContent = formatTime(cur);
+    durTime.textContent = formatTime(dur);
+    if (lyricsShown && lyricsData) updateKaraoke(cur);
+  }, 250);
+}
+
+function formatTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+}
+
+// ---------- Lyrics (lyrics.ovh, free) with estimated karaoke timing ----------
+const lyricsBtn = document.getElementById('lyricsBtn');
+const lyricsPanel = document.getElementById('lyricsPanel');
+let lyricsShown = false;
+let lyricsLoadedFor = -1;
+let lyricsData = null; // { lines: [{ words: [{text, start, end}], start, end }] }
+
+lyricsBtn.addEventListener('click', async () => {
+  if (currentIndex === -1) return;
+  lyricsShown = !lyricsShown;
+  lyricsPanel.classList.toggle('show', lyricsShown);
+  lyricsBtn.classList.toggle('on', lyricsShown);
+
+  if (lyricsShown && lyricsLoadedFor !== currentIndex) {
+    lyricsPanel.innerHTML = '<div class="status">Loading lyrics...</div>';
+    const track = queue[currentIndex];
+    const guess = guessArtistTitle(track.title, track.channel);
+    try {
+      const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(guess.artist)}/${encodeURIComponent(guess.title)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.lyrics) {
+        buildKaraokeModel(data.lyrics);
+        renderLyricLines();
+      } else {
+        lyricsData = null;
+        lyricsPanel.innerHTML = '<div class="status">No lyrics found for this track.</div>';
+      }
+      lyricsLoadedFor = currentIndex;
+    } catch (err) {
+      lyricsData = null;
+      lyricsPanel.innerHTML = '<div class="status">Could not load lyrics right now.</div>';
+    }
+  }
+});
+
+function resetLyrics() {
+  lyricsShown = false;
+  lyricsLoadedFor = -1;
+  lyricsData = null;
+  lyricsPanel.classList.remove('show');
+  lyricsBtn.classList.remove('on');
+  lyricsPanel.innerHTML = '';
+}
+
+// Build an estimated word-timing model by spacing lines/words evenly
+// across the video's duration. Not perfectly beat-accurate (no free API
+// gives real sync data) but gives a karaoke-style scroll + highlight.
+function buildKaraokeModel(rawLyrics) {
+  const dur = (isPlayerReady && player.getDuration) ? player.getDuration() : 180;
+  const lines = rawLyrics.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) { lyricsData = null; return; }
+
+  // weight each line by its word count so longer lines get more time
+  const lineWordCounts = lines.map(l => l.split(/\s+/).length);
+  const totalWords = lineWordCounts.reduce((a, b) => a + b, 0) || 1;
+  const usableDur = dur > 0 ? dur : 180;
+
+  let t = 0;
+  const builtLines = lines.map((line, li) => {
+    const words = line.split(/\s+/);
+    const lineDur = (lineWordCounts[li] / totalWords) * usableDur;
+    const lineStart = t;
+    const lineEnd = t + lineDur;
+    const wordDur = lineDur / (words.length || 1);
+    const builtWords = words.map((w, wi) => ({
+      text: w,
+      start: lineStart + wi * wordDur,
+      end: lineStart + (wi + 1) * wordDur
+    }));
+    t = lineEnd;
+    return { words: builtWords, start: lineStart, end: lineEnd };
+  });
+
+  lyricsData = { lines: builtLines };
+}
+
+function renderLyricLines() {
+  if (!lyricsData) return;
+  lyricsPanel.innerHTML = lyricsData.lines.map((line, li) => `
+    <div class="lyric-line" data-line="${li}">
+      ${line.words.map((w, wi) => `<span class="lyric-word" data-line="${li}" data-word="${wi}">${escapeHtml(w.text)}</span>`).join(' ')}
+    </div>
+  `).join('');
+}
+
+let lastActiveLine = -1;
+function updateKaraoke(currentTime) {
+  if (!lyricsData) return;
+  let activeLine = -1;
+  for (let i = 0; i < lyricsData.lines.length; i++) {
+    if (currentTime >= lyricsData.lines[i].start && currentTime < lyricsData.lines[i].end) { activeLine = i; break; }
+  }
+  if (activeLine === -1 && currentTime >= (lyricsData.lines[lyricsData.lines.length - 1]?.end || 0)) {
+    activeLine = lyricsData.lines.length - 1;
+  }
+
+  if (activeLine !== lastActiveLine) {
+    document.querySelectorAll('.lyric-line.active').forEach(el => el.classList.remove('active'));
+    const el = lyricsPanel.querySelector(`.lyric-line[data-line="${activeLine}"]`);
+    if (el) {
+      el.classList.add('active');
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    lastActiveLine = activeLine;
+  }
+
+  if (activeLine >= 0) {
+    const line = lyricsData.lines[activeLine];
+    line.words.forEach((w, wi) => {
+      const wordEl = lyricsPanel.querySelector(`.lyric-word[data-line="${activeLine}"][data-word="${wi}"]`);
+      if (!wordEl) return;
+      wordEl.classList.toggle('sung', currentTime >= w.start);
+    });
+  }
+}
+
+function guessArtistTitle(fullTitle, channel) {
+  let clean = fullTitle
+    .replace(/\(.*?\)/g, '')
+    .replace(/\[.*?\]/g, '')
+    .replace(/official video|official audio|lyrics|lyric video|hd|4k/gi, '')
+    .trim();
+  if (clean.includes('-')) {
+    const parts = clean.split('-');
+    return { artist: parts[0].trim(), title: parts.slice(1).join('-').trim() };
+  }
+  return { artist: channel.replace(/vevo/gi, '').trim(), title: clean };
+}
+
+// ==================================================================
+// NATIVE APP ONLY: background audio + lock-screen controls.
+// This block only runs when Wave is running inside the Capacitor
+// native wrapper (i.e. installed as a real Android app), not when
+// opened as a normal website. Everything above this still works
+// exactly the same either way.
+// ==================================================================
+document.addEventListener('deviceready', function () {
+  // Keep the app's process alive (foreground service) so the WebView
+  // and YouTube audio keep running with the screen off or app backgrounded.
+  if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode) {
+    const bg = cordova.plugins.backgroundMode;
+    bg.setDefaults({
+      title: 'Wave',
+      text: 'Playing music',
+      silent: false
+    });
+    bg.enable();
+    bg.on('activate', function () {
+      bg.disableWebViewOptimizations();
+    });
+  }
+
+  // Real lock-screen / notification-shade controls with track info,
+  // artwork, and working play/pause/next/prev buttons.
+  if (window.MusicControls) {
+    function syncLockScreenControls(track, isPlaying) {
+      MusicControls.create({
+        track: track ? track.title : 'Nothing playing',
+        artist: track ? track.channel : 'Wave',
+        cover: track ? track.thumb : '',
+        isPlaying: !!isPlaying,
+        dismissable: false,
+        hasPrev: true,
+        hasNext: true,
+        hasClose: false
+      });
+      MusicControls.subscribe(function (action) {
+        const parsed = JSON.parse(action).message;
+        if (parsed === 'music-controls-next') playNext();
+        else if (parsed === 'music-controls-previous') playPrev();
+        else if (parsed === 'music-controls-pause') { if (isPlayerReady) player.pauseVideo(); }
+        else if (parsed === 'music-controls-play') { if (isPlayerReady) player.playVideo(); }
+      });
+      MusicControls.listen();
+    }
+
+    // Hook into the existing updateMediaSession() calls: whenever the web
+    // app updates the browser's Media Session, mirror the same info to
+    // the native lock-screen controls plugin.
+    const originalUpdateMediaSession = window.updateMediaSession;
+    window.updateMediaSession = function (track) {
+      if (typeof originalUpdateMediaSession === 'function') originalUpdateMediaSession(track);
+      syncLockScreenControls(track, true);
+    };
+  }
+}, false);
+
+</script>
+
+</body>
+</html>
