@@ -1,0 +1,13 @@
+{
+  "name": "Wave — Personal Music Player",
+  "short_name": "Wave",
+  "description": "Search, play, and save your own music playlists.",
+  "start_url": "./index-v2.html",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
